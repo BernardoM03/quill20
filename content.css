@@ -1,0 +1,257 @@
+/* Roll20 Sheet Notes
+   A field notebook clipped to the edge of the sheet: ink chrome, linen page. */
+
+#r20-notes-root {
+  --r20n-width: 340px;
+  --r20n-ink: #17130f;
+  --r20n-ink-2: #241d17;
+  --r20n-linen: #f3ede1;
+  --r20n-graphite: #33291f;
+  --r20n-oxblood: #8c2f28;
+  --r20n-muted: #9b8f80;
+  --r20n-rule: rgba(51, 41, 31, 0.12);
+  --r20n-z: 2147483000;
+
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: 0;
+  z-index: var(--r20n-z);
+  pointer-events: none;
+  font-family: ui-sans-serif, system-ui, "Segoe UI", Helvetica, Arial, sans-serif;
+  color: var(--r20n-graphite);
+  line-height: 1.5;
+}
+
+#r20-notes-root[hidden] { display: none; }
+
+#r20-notes-root * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+#r20-notes-root :focus-visible {
+  outline: 2px solid var(--r20n-oxblood);
+  outline-offset: 2px;
+}
+
+/* -------------------------------------------------------------- edge tab */
+
+#r20-notes-root .r20n-tab {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  padding: 18px 0;
+  border: 0;
+  border-radius: 6px 0 0 6px;
+  background: var(--r20n-ink);
+  color: var(--r20n-linen);
+  cursor: pointer;
+  box-shadow: -2px 0 12px rgba(0, 0, 0, 0.28);
+  transition: background 140ms ease, right 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#r20-notes-root .r20n-tab:hover { background: var(--r20n-oxblood); }
+
+#r20-notes-root.is-open .r20n-tab { right: var(--r20n-width); }
+
+#r20-notes-root .r20n-tab-label {
+  writing-mode: vertical-rl;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* ---------------------------------------------------------------- drawer */
+
+#r20-notes-root .r20n-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--r20n-width);
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--r20n-linen);
+  border-left: 1px solid var(--r20n-ink);
+  box-shadow: -10px 0 34px rgba(0, 0, 0, 0.3);
+  transform: translateX(100%);
+  transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#r20-notes-root.is-open .r20n-drawer { transform: translateX(0); }
+
+#r20-notes-root .r20n-grip {
+  position: absolute;
+  top: 0;
+  left: -3px;
+  bottom: 0;
+  width: 7px;
+  cursor: col-resize;
+  background: transparent;
+}
+
+#r20-notes-root .r20n-grip:hover { background: rgba(140, 47, 40, 0.28); }
+
+/* ------------------------------------------------------------------ head */
+
+#r20-notes-root .r20n-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 14px 12px;
+  background: var(--r20n-ink);
+  color: var(--r20n-linen);
+}
+
+#r20-notes-root .r20n-titles { flex: 1; min-width: 0; }
+
+#r20-notes-root .r20n-eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--r20n-muted);
+}
+
+#r20-notes-root .r20n-title {
+  font-family: "Iowan Old Style", Palatino, Georgia, serif;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+
+#r20-notes-root .r20n-close {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--r20n-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#r20-notes-root .r20n-close:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--r20n-linen);
+}
+
+/* --------------------------------------------------------------- toolbar */
+
+#r20-notes-root .r20n-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 10px;
+  background: var(--r20n-ink-2);
+  border-bottom: 1px solid var(--r20n-ink);
+}
+
+#r20-notes-root .r20n-toolbar button {
+  min-width: 28px;
+  height: 26px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--r20n-linen);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+#r20-notes-root .r20n-toolbar button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+#r20-notes-root .r20n-toolbar button.is-active {
+  background: var(--r20n-oxblood);
+}
+
+#r20-notes-root .r20n-sep {
+  width: 1px;
+  height: 15px;
+  margin: 0 4px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* ---------------------------------------------------------------- editor */
+
+/* The signature: a ruled page with a margin line, so the drawer reads as
+   paper rather than another panel of app chrome. */
+#r20-notes-root .r20n-editor {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px 24px 30px;
+  background:
+    linear-gradient(to right,
+      transparent 21px, rgba(140, 47, 40, 0.35) 21px,
+      rgba(140, 47, 40, 0.35) 22px, transparent 22px),
+    repeating-linear-gradient(to bottom,
+      transparent 0 27px, var(--r20n-rule) 27px 28px);
+  font-family: "Iowan Old Style", Palatino, Georgia, serif;
+  font-size: 15px;
+  line-height: 28px;
+  color: var(--r20n-graphite);
+  overflow-wrap: break-word;
+}
+
+#r20-notes-root .r20n-editor:focus { outline: none; }
+
+#r20-notes-root .r20n-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--r20n-muted);
+  font-style: italic;
+}
+
+#r20-notes-root .r20n-editor ul,
+#r20-notes-root .r20n-editor ol {
+  padding-left: 22px;
+  margin: 0;
+}
+
+#r20-notes-root .r20n-editor li { line-height: 28px; }
+
+#r20-notes-root .r20n-editor p { margin: 0; }
+
+/* ------------------------------------------------------------------ foot */
+
+#r20-notes-root .r20n-foot {
+  padding: 8px 14px;
+  background: var(--r20n-ink);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#r20-notes-root .r20n-status {
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--r20n-muted);
+}
+
+#r20-notes-root .r20n-status.is-ok { color: #8fae86; }
+#r20-notes-root .r20n-status.is-bad { color: #e08a83; }
+
+/* --------------------------------------------------------------- narrow */
+
+@media (max-width: 620px) {
+  #r20-notes-root { --r20n-width: 88vw; }
+  #r20-notes-root .r20n-grip { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #r20-notes-root .r20n-drawer,
+  #r20-notes-root .r20n-tab { transition: none; }
+}

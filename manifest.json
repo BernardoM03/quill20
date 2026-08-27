@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Roll20 Sheet Notes",
+  "version": "1.0.0",
+  "description": "Adds a per-character notes drawer to Roll20 character sheets.",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": ["https://app.roll20.net/characters/sheet/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}
