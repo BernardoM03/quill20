@@ -1,43 +1,140 @@
-/* Roll20 Sheet Notes
-   A field notebook clipped to the edge of the sheet: ink chrome, linen page. */
+/* D&D Beyond Sheet Notes
+   A plain side panel in two themes — cool neutral light, warm sepia dark —
+   that can split into two stacked note areas and push the page aside. */
 
-#r20-notes-root {
-  --r20n-width: 340px;
-  --r20n-ink: #17130f;
-  --r20n-ink-2: #241d17;
-  --r20n-linen: #f3ede1;
-  --r20n-graphite: #33291f;
-  --r20n-oxblood: #8c2f28;
-  --r20n-muted: #9b8f80;
-  --r20n-rule: rgba(51, 41, 31, 0.12);
-  --r20n-z: 2147483000;
+:root {
+  --ddbn-width: 340px;
+}
+
+/* ------------------------------------------------------------- push mode */
+
+/* Narrowing the root element is what makes the page's own flex layout
+   reflow into the remaining space rather than sitting under the drawer. */
+html.ddbn-pushed {
+  width: calc(100% - var(--ddbn-width)) !important;
+  min-width: 0 !important;
+  overflow-x: hidden !important;
+  transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html.ddbn-pushed > body {
+  max-width: 100% !important;
+}
+
+/* Only added when the page's body actually fills the viewport. It makes
+   body a containing block, so the app's own position:fixed chrome moves
+   with the push instead of staying pinned to the full viewport. */
+html.ddbn-contain > body {
+  contain: layout paint;
+}
+
+/* No easing while a drag is in flight; the pointer is the clock. */
+html.ddbn-dragging,
+html.ddbn-dragging.ddbn-pushed {
+  transition: none !important;
+}
+
+/* ---------------------------------------------------------------- themes */
+
+#ddb-notes-root {
+  /* Light: cool neutral. */
+  --ddbn-ink: #1d2024;
+  --ddbn-surface: #ffffff;
+  --ddbn-panel: #f2f4f6;
+  --ddbn-border: #dce0e5;
+  --ddbn-text: #23262a;
+  --ddbn-muted: #8d949c;
+  --ddbn-accent: #3d7ab8;
+  --ddbn-on-accent: #ffffff;
+  --ddbn-head-text: #f6f7f8;
+  --ddbn-hover: rgba(15, 20, 25, 0.06);
+  --ddbn-danger: #b23c32;
+  --ddbn-good: #4a7d54;
+  --ddbn-shadow: rgba(15, 20, 25, 0.14);
+}
+
+/* Dark: warm browns under sepia text, amber for anything that reads as
+   marked or selected. */
+#ddb-notes-root[data-theme="dark"],
+#ddb-notes-root[data-theme="auto"] {
+  color-scheme: dark;
+}
+
+#ddb-notes-root[data-theme="dark"] {
+  --ddbn-ink: #16120e;
+  --ddbn-surface: #1e1915;
+  --ddbn-panel: #17130f;
+  --ddbn-border: #3a3129;
+  --ddbn-text: #e9d9bd;
+  --ddbn-muted: #a4907a;
+  --ddbn-accent: #c98a4b;
+  --ddbn-on-accent: #1a1410;
+  --ddbn-head-text: #f0e2c9;
+  --ddbn-hover: rgba(233, 217, 189, 0.08);
+  --ddbn-danger: #d9776a;
+  --ddbn-good: #a8bb7e;
+  --ddbn-shadow: rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-color-scheme: light) {
+  #ddb-notes-root[data-theme="auto"] { color-scheme: light; }
+}
+
+@media (prefers-color-scheme: dark) {
+  #ddb-notes-root[data-theme="auto"] {
+    --ddbn-ink: #16120e;
+    --ddbn-surface: #1e1915;
+    --ddbn-panel: #17130f;
+    --ddbn-border: #3a3129;
+    --ddbn-text: #e9d9bd;
+    --ddbn-muted: #a4907a;
+    --ddbn-accent: #c98a4b;
+    --ddbn-on-accent: #1a1410;
+    --ddbn-head-text: #f0e2c9;
+    --ddbn-hover: rgba(233, 217, 189, 0.08);
+    --ddbn-danger: #d9776a;
+    --ddbn-good: #a8bb7e;
+    --ddbn-shadow: rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* ------------------------------------------------------------------ root */
+
+#ddb-notes-root {
+  --ddbn-split: 50%;
+  --ddbn-font: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
+    "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ddbn-z: 2147483000;
 
   position: fixed;
   inset: 0 0 0 auto;
   width: 0;
-  z-index: var(--r20n-z);
+  z-index: var(--ddbn-z);
   pointer-events: none;
-  font-family: ui-sans-serif, system-ui, "Segoe UI", Helvetica, Arial, sans-serif;
-  color: var(--r20n-graphite);
+  font-family: var(--ddbn-font);
+  font-size: 14px;
+  color: var(--ddbn-text);
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
-#r20-notes-root[hidden] { display: none; }
+#ddb-notes-root[hidden] { display: none; }
 
-#r20-notes-root * {
+#ddb-notes-root * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  font-family: inherit;
 }
 
-#r20-notes-root :focus-visible {
-  outline: 2px solid var(--r20n-oxblood);
+#ddb-notes-root :focus-visible {
+  outline: 2px solid var(--ddbn-accent);
   outline-offset: 2px;
 }
 
 /* -------------------------------------------------------------- edge tab */
 
-#r20-notes-root .r20n-tab {
+#ddb-notes-root .ddbn-tab {
   position: absolute;
   top: 50%;
   right: 0;
@@ -50,46 +147,49 @@
   padding: 18px 0;
   border: 0;
   border-radius: 6px 0 0 6px;
-  background: var(--r20n-ink);
-  color: var(--r20n-linen);
+  background: var(--ddbn-ink);
+  color: var(--ddbn-head-text);
   cursor: pointer;
-  box-shadow: -2px 0 12px rgba(0, 0, 0, 0.28);
+  box-shadow: -2px 0 12px var(--ddbn-shadow);
   transition: background 140ms ease, right 220ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-#r20-notes-root .r20n-tab:hover { background: var(--r20n-oxblood); }
+#ddb-notes-root .ddbn-tab:hover {
+  background: var(--ddbn-accent);
+  color: var(--ddbn-on-accent);
+}
 
-#r20-notes-root.is-open .r20n-tab { right: var(--r20n-width); }
+#ddb-notes-root.is-open .ddbn-tab { right: var(--ddbn-width); }
 
-#r20-notes-root .r20n-tab-label {
+#ddb-notes-root .ddbn-tab-label {
   writing-mode: vertical-rl;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 /* ---------------------------------------------------------------- drawer */
 
-#r20-notes-root .r20n-drawer {
+#ddb-notes-root .ddbn-drawer {
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
-  width: var(--r20n-width);
+  width: var(--ddbn-width);
   pointer-events: auto;
   display: flex;
   flex-direction: column;
-  background: var(--r20n-linen);
-  border-left: 1px solid var(--r20n-ink);
-  box-shadow: -10px 0 34px rgba(0, 0, 0, 0.3);
+  background: var(--ddbn-surface);
+  border-left: 1px solid var(--ddbn-border);
+  box-shadow: -8px 0 24px var(--ddbn-shadow);
   transform: translateX(100%);
   transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-#r20-notes-root.is-open .r20n-drawer { transform: translateX(0); }
+#ddb-notes-root.is-open .ddbn-drawer { transform: translateX(0); }
 
-#r20-notes-root .r20n-grip {
+#ddb-notes-root .ddbn-grip {
   position: absolute;
   top: 0;
   left: -3px;
@@ -97,161 +197,365 @@
   width: 7px;
   cursor: col-resize;
   background: transparent;
+  z-index: 2;
 }
 
-#r20-notes-root .r20n-grip:hover { background: rgba(140, 47, 40, 0.28); }
+#ddb-notes-root .ddbn-grip:hover {
+  background: color-mix(in srgb, var(--ddbn-accent) 40%, transparent);
+}
 
 /* ------------------------------------------------------------------ head */
 
-#r20-notes-root .r20n-head {
+/* Deliberately one line tall: every row of chrome here is a row the notes
+   do not get. */
+#ddb-notes-root .ddbn-head {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 14px 14px 12px;
-  background: var(--r20n-ink);
-  color: var(--r20n-linen);
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 13px;
+  background: var(--ddbn-ink);
+  color: var(--ddbn-head-text);
 }
 
-#r20-notes-root .r20n-titles { flex: 1; min-width: 0; }
-
-#r20-notes-root .r20n-eyebrow {
-  font-size: 10px;
+#ddb-notes-root .ddbn-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--r20n-muted);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-#r20-notes-root .r20n-title {
-  font-family: "Iowan Old Style", Palatino, Georgia, serif;
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 1.25;
-  margin-top: 3px;
-  overflow-wrap: anywhere;
-}
-
-#r20-notes-root .r20n-close {
+#ddb-notes-root .ddbn-close {
   flex: none;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: var(--r20n-muted);
-  font-size: 20px;
+  color: var(--ddbn-muted);
+  font-size: 19px;
   line-height: 1;
   cursor: pointer;
 }
 
-#r20-notes-root .r20n-close:hover {
-  background: rgba(255, 255, 255, 0.09);
-  color: var(--r20n-linen);
+#ddb-notes-root .ddbn-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ddbn-head-text);
 }
 
 /* --------------------------------------------------------------- toolbar */
 
-#r20-notes-root .r20n-toolbar {
+#ddb-notes-root .ddbn-toolbar {
   display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 7px 10px;
-  background: var(--r20n-ink-2);
-  border-bottom: 1px solid var(--r20n-ink);
+  gap: 2px;
+  padding: 5px 7px;
+  background: var(--ddbn-surface);
+  border-bottom: 1px solid var(--ddbn-border);
 }
 
-#r20-notes-root .r20n-toolbar button {
-  min-width: 28px;
-  height: 26px;
+#ddb-notes-root .ddbn-toolbar button {
+  min-width: 26px;
+  height: 24px;
   padding: 0 7px;
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: var(--r20n-linen);
+  color: var(--ddbn-text);
   font-size: 12px;
-  font-family: inherit;
   cursor: pointer;
 }
 
-#r20-notes-root .r20n-toolbar button:hover {
-  background: rgba(255, 255, 255, 0.1);
+#ddb-notes-root .ddbn-toolbar button:hover { background: var(--ddbn-hover); }
+
+#ddb-notes-root .ddbn-toolbar button.is-active {
+  background: var(--ddbn-accent);
+  color: var(--ddbn-on-accent);
 }
 
-#r20-notes-root .r20n-toolbar button.is-active {
-  background: var(--r20n-oxblood);
-}
-
-#r20-notes-root .r20n-sep {
+#ddb-notes-root .ddbn-sep {
   width: 1px;
-  height: 15px;
+  height: 14px;
   margin: 0 4px;
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--ddbn-border);
 }
 
-/* ---------------------------------------------------------------- editor */
+#ddb-notes-root .ddbn-split-toggle {
+  margin-left: auto;
+  border: 1px solid var(--ddbn-border) !important;
+  border-radius: 11px !important;
+  color: var(--ddbn-muted) !important;
+  font-size: 11px !important;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
 
-/* The signature: a ruled page with a margin line, so the drawer reads as
-   paper rather than another panel of app chrome. */
-#r20-notes-root .r20n-editor {
+#ddb-notes-root .ddbn-split-toggle.is-active {
+  background: var(--ddbn-accent) !important;
+  border-color: var(--ddbn-accent) !important;
+  color: var(--ddbn-on-accent) !important;
+}
+
+/* ----------------------------------------------------------------- panes */
+
+#ddb-notes-root .ddbn-panes {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#ddb-notes-root .ddbn-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+#ddb-notes-root .ddbn-pane[data-pane="b"] { display: none; }
+
+#ddb-notes-root.is-split .ddbn-pane[data-pane="a"] {
+  flex: 0 0 var(--ddbn-split);
+}
+
+#ddb-notes-root.is-split .ddbn-pane[data-pane="b"] {
+  display: flex;
+  flex: 1 1 auto;
+}
+
+/* Which pane the toolbar will act on. */
+#ddb-notes-root.is-split .ddbn-pane.is-focus .ddbn-sectionbar {
+  box-shadow: inset 3px 0 0 var(--ddbn-accent);
+}
+
+#ddb-notes-root .ddbn-hsplit {
+  display: none;
+  flex: none;
+  height: 7px;
+  cursor: row-resize;
+  background: var(--ddbn-panel);
+  border-top: 1px solid var(--ddbn-border);
+}
+
+#ddb-notes-root.is-split .ddbn-hsplit { display: block; }
+
+#ddb-notes-root .ddbn-hsplit:hover,
+#ddb-notes-root.is-hdragging .ddbn-hsplit {
+  background: color-mix(in srgb, var(--ddbn-accent) 40%, transparent);
+}
+
+/* -------------------------------------------------------------- sections */
+
+#ddb-notes-root .ddbn-sectionbar {
+  display: flex;
+  align-items: stretch;
+  flex: none;
+  background: var(--ddbn-panel);
+  border-bottom: 1px solid var(--ddbn-border);
+}
+
+#ddb-notes-root .ddbn-sections {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 4px 0 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+#ddb-notes-root .ddbn-sections::-webkit-scrollbar { height: 4px; }
+#ddb-notes-root .ddbn-sections::-webkit-scrollbar-thumb {
+  background: var(--ddbn-border);
+  border-radius: 2px;
+}
+
+#ddb-notes-root .ddbn-sec {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 180px;
+  padding: 4px 8px 5px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 5px 5px 0 0;
+  background: transparent;
+  color: var(--ddbn-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#ddb-notes-root .ddbn-sec:hover {
+  background: var(--ddbn-hover);
+  color: var(--ddbn-text);
+}
+
+#ddb-notes-root .ddbn-sec.is-active {
+  background: var(--ddbn-surface);
+  border-color: var(--ddbn-border);
+  color: var(--ddbn-text);
+  font-weight: 600;
+  box-shadow: 0 1px 0 0 var(--ddbn-surface);
+}
+
+/* Open in the other pane: still reachable, but marked as spoken for. */
+#ddb-notes-root .ddbn-sec.is-elsewhere {
+  color: var(--ddbn-accent);
+  opacity: 0.75;
+}
+
+#ddb-notes-root .ddbn-sec-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+
+#ddb-notes-root .ddbn-sec-name.is-editing {
+  outline: 2px solid var(--ddbn-accent);
+  outline-offset: 1px;
+  border-radius: 2px;
+  cursor: text;
+  overflow: visible;
+}
+
+#ddb-notes-root .ddbn-sec-del {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  color: var(--ddbn-muted);
+  font-size: 14px;
+  line-height: 1;
+}
+
+#ddb-notes-root .ddbn-sec-del:hover {
+  background: color-mix(in srgb, var(--ddbn-danger) 18%, transparent);
+  color: var(--ddbn-danger);
+}
+
+#ddb-notes-root .ddbn-add {
+  flex: none;
+  width: 28px;
+  border: 0;
+  border-left: 1px solid var(--ddbn-border);
+  background: transparent;
+  color: var(--ddbn-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#ddb-notes-root .ddbn-add:hover {
+  background: var(--ddbn-hover);
+  color: var(--ddbn-text);
+}
+
+/* --------------------------------------------------------------- editors */
+
+#ddb-notes-root .ddbn-editor {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 16px 18px 24px 30px;
-  background:
-    linear-gradient(to right,
-      transparent 21px, rgba(140, 47, 40, 0.35) 21px,
-      rgba(140, 47, 40, 0.35) 22px, transparent 22px),
-    repeating-linear-gradient(to bottom,
-      transparent 0 27px, var(--r20n-rule) 27px 28px);
-  font-family: "Iowan Old Style", Palatino, Georgia, serif;
-  font-size: 15px;
-  line-height: 28px;
-  color: var(--r20n-graphite);
+  padding: 12px 15px 20px;
+  background: var(--ddbn-surface);
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--ddbn-text);
+  caret-color: var(--ddbn-accent);
   overflow-wrap: break-word;
 }
 
-#r20-notes-root .r20n-editor:focus { outline: none; }
+#ddb-notes-root .ddbn-editor:focus { outline: none; }
 
-#r20-notes-root .r20n-editor:empty::before {
+#ddb-notes-root .ddbn-editor:empty::before {
   content: attr(data-placeholder);
-  color: var(--r20n-muted);
-  font-style: italic;
+  color: var(--ddbn-muted);
 }
 
-#r20-notes-root .r20n-editor ul,
-#r20-notes-root .r20n-editor ol {
+#ddb-notes-root .ddbn-editor ul,
+#ddb-notes-root .ddbn-editor ol {
   padding-left: 22px;
   margin: 0;
 }
 
-#r20-notes-root .r20n-editor li { line-height: 28px; }
-
-#r20-notes-root .r20n-editor p { margin: 0; }
+#ddb-notes-root .ddbn-editor p { margin: 0; }
 
 /* ------------------------------------------------------------------ foot */
 
-#r20-notes-root .r20n-foot {
-  padding: 8px 14px;
-  background: var(--r20n-ink);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+#ddb-notes-root .ddbn-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 13px;
+  background: var(--ddbn-panel);
+  border-top: 1px solid var(--ddbn-border);
 }
 
-#r20-notes-root .r20n-status {
+#ddb-notes-root .ddbn-status {
+  flex: 1;
+  min-width: 0;
   font-size: 11px;
-  letter-spacing: 0.03em;
-  color: var(--r20n-muted);
+  color: var(--ddbn-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-#r20-notes-root .r20n-status.is-ok { color: #8fae86; }
-#r20-notes-root .r20n-status.is-bad { color: #e08a83; }
+#ddb-notes-root .ddbn-status.is-ok { color: var(--ddbn-good); }
+#ddb-notes-root .ddbn-status.is-bad {
+  color: var(--ddbn-danger);
+  white-space: normal;
+}
+
+#ddb-notes-root .ddbn-foot button {
+  flex: none;
+  height: 21px;
+  padding: 0 9px;
+  border: 1px solid var(--ddbn-border);
+  border-radius: 11px;
+  background: transparent;
+  color: var(--ddbn-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+#ddb-notes-root .ddbn-foot button:hover {
+  background: var(--ddbn-hover);
+  color: var(--ddbn-text);
+}
+
+#ddb-notes-root .ddbn-foot button.is-active {
+  background: var(--ddbn-accent);
+  border-color: var(--ddbn-accent);
+  color: var(--ddbn-on-accent);
+}
 
 /* --------------------------------------------------------------- narrow */
 
 @media (max-width: 620px) {
-  #r20-notes-root { --r20n-width: 88vw; }
-  #r20-notes-root .r20n-grip { display: none; }
+  :root { --ddbn-width: 88vw; }
+  #ddb-notes-root .ddbn-grip { display: none; }
+  /* Too little room left to push anything into. */
+  html.ddbn-pushed { width: 100% !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #r20-notes-root .r20n-drawer,
-  #r20-notes-root .r20n-tab { transition: none; }
+  html.ddbn-pushed,
+  #ddb-notes-root .ddbn-drawer,
+  #ddb-notes-root .ddbn-tab { transition: none; }
 }

@@ -1,12 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Roll20 Sheet Notes",
-  "version": "1.0.0",
-  "description": "Adds a per-character notes drawer to Roll20 character sheets.",
+  "name": "D&D Beyond Sheet Notes",
+  "version": "1.2.0",
+  "description": "Adds a per-character notes drawer, with sections and a split view, to D&D Beyond character sheets.",
   "permissions": ["storage"],
   "content_scripts": [
     {
-      "matches": ["https://app.roll20.net/characters/sheet/*"],
+      "matches": [
+        "https://www.dndbeyond.com/characters/*",
+        "https://www.dndbeyond.com/profile/*/characters/*"
+      ],
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_idle",
