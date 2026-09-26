@@ -7,18 +7,22 @@
   const SAVE_DELAY = 600;
   const MIN_WIDTH = 260;
   const MAX_WIDTH = 720;
+  const DEF_WIDTH = 340;
+  const DEF_RATIO = 0.5;
+  const POLL = 800;
   const SCHEMA = 3;
   const THEMES = ["auto", "light", "dark"];
 
   // ---------------------------------------------------------------- storage
 
+  // chrome.storage.local.get fills in defaults itself when handed a
+  // key -> default object, so every setting reads in a single round trip.
   const store = {
-    async get(key, fallback) {
+    async get(query) {
       try {
-        const res = await chrome.storage.local.get(key);
-        return key in res ? res[key] : fallback;
+        return await chrome.storage.local.get(query);
       } catch {
-        return fallback;
+        return Array.isArray(query) ? {} : { ...query };
       }
     },
     async set(key, value) {
@@ -33,8 +37,9 @@
 
   // Sheets live at /characters/<id>, and the same id also appears under
   // /profile/<user>/characters/<id> and the builder's /characters/<id>/builder.
+  const CHAR_PATH = /\/characters\/(\d+)(?:\/|$)/;
   const characterId = () => {
-    const m = location.pathname.match(/\/characters\/(\d+)(?:\/|$)/);
+    const m = CHAR_PATH.exec(location.pathname);
     return m ? m[1] : null;
   };
 
@@ -59,38 +64,50 @@
     "UL", "OL", "LI", "P", "DIV", "BR",
   ]);
 
+  // Two inert documents, made once and reused. Building a fresh one per
+  // call was the bulk of the cost of sanitizing on every debounced save.
+  const scratch = document.implementation.createHTMLDocument("").body;
+  const probe = document.implementation.createHTMLDocument("").body;
+
+  const MARKUP = /[<>&]/;
+  const SPACE = /\s/g;
+
   function sanitize(html) {
-    const dirty = document.implementation.createHTMLDocument("").body;
-    dirty.innerHTML = String(html || "");
+    const src = String(html || "");
+    // Plain text survives a rebuild unchanged, and plain text is what most
+    // of a note is, so skip the parse when there is no markup to strip.
+    if (!MARKUP.test(src)) return src;
+
+    scratch.innerHTML = src;
     const clean = document.createElement("div");
-    walk(dirty, clean);
+    walk(scratch, clean);
+    scratch.textContent = "";
     return clean.innerHTML;
   }
 
   function walk(from, to) {
-    for (const node of Array.from(from.childNodes)) {
+    for (let node = from.firstChild; node; node = node.nextSibling) {
       if (node.nodeType === Node.TEXT_NODE) {
         to.appendChild(document.createTextNode(node.nodeValue));
-        continue;
-      }
-      if (node.nodeType !== Node.ELEMENT_NODE) continue;
-
-      if (ALLOWED.has(node.tagName)) {
-        const el = document.createElement(node.tagName.toLowerCase());
-        to.appendChild(el);
-        walk(node, el);
-      } else {
-        // Unwrap unknown elements, keep their text.
-        walk(node, to);
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        if (ALLOWED.has(node.tagName)) {
+          const el = document.createElement(node.tagName.toLowerCase());
+          to.appendChild(el);
+          walk(node, el);
+        } else {
+          // Unwrap unknown elements, keep their text.
+          walk(node, to);
+        }
       }
     }
   }
 
   // "Empty" for the delete prompt: no text once tags and entities resolve.
   function isBlank(html) {
-    const probe = document.implementation.createHTMLDocument("").body;
     probe.innerHTML = sanitize(html);
-    return !probe.textContent.replace(/\s| /g, "");
+    const blank = !probe.textContent.replace(SPACE, "");
+    probe.textContent = "";
+    return blank;
   }
 
   // ------------------------------------------------------------------- ui
@@ -159,6 +176,10 @@
   const pushBtn = root.querySelector(".ddbn-push-toggle");
   const status = root.querySelector(".ddbn-status");
 
+  const htmlEl = document.documentElement;
+  const rootStyle = root.style;
+  const htmlStyle = htmlEl.style;
+
   // ------------------------------------------------------------------ panes
 
   // Two identical stacked editors. Each one points at its own section, so
@@ -184,6 +205,7 @@
       list: el.querySelector(".ddbn-sections"),
       addBtn: el.querySelector(".ddbn-add"),
       editor: el.querySelector(".ddbn-editor"),
+      activeBtn: null,
     };
   }
 
@@ -198,7 +220,6 @@
 
   panes.append(paneA.el, divider, paneB.el);
   const allPanes = [paneA, paneB];
-  const paneOf = (key) => (key === "b" ? paneB : paneA);
   const other = (pane) => (pane === paneA ? paneB : paneA);
 
   // -------------------------------------------------------- document model
@@ -206,6 +227,10 @@
   // { v, sections: [{ id, name, html, updated }], active: { a, b }, updated }
   let currentId = null;
   let doc = null;
+  // Set whenever the model diverges from what is in storage, so the saves
+  // fired on blur, on navigation and on tab hide cost nothing when there is
+  // no actual change behind them.
+  let dirty = false;
 
   const newSection = (name = "Section") => ({
     id: uid(),
@@ -221,6 +246,8 @@
 
   // v1 was one { html, updated }; v2 added sections with a single activeId.
   // Both fold forward so nothing written before an upgrade is stranded.
+  // This is also the one place stored markup is re-checked against the
+  // allowlist, which lets everything downstream treat it as already clean.
   function migrate(saved) {
     if (!saved || typeof saved !== "object") return emptyDoc();
 
@@ -232,12 +259,12 @@
         .map((s) => ({
           id: typeof s.id === "string" && s.id ? s.id : uid(),
           name: String(s.name || "Section").slice(0, 60),
-          html: typeof s.html === "string" ? s.html : "",
+          html: typeof s.html === "string" ? sanitize(s.html) : "",
           updated: Number(s.updated) || Date.now(),
         }));
     } else if (typeof saved.html === "string") {
       const s = newSection("General");
-      s.html = saved.html;
+      s.html = sanitize(saved.html);
       s.updated = Number(saved.updated) || Date.now();
       sections = [s];
     }
@@ -276,7 +303,12 @@
     tab.title = open ? "Close notes" : "Open notes";
     if (persist) store.set(UI_OPEN, open);
     syncPush();
-    if (open) focusPane(lastFocused);
+    if (open) {
+      // Tab strips rendered while the drawer was closed skip the scroll, so
+      // catch up on the way in.
+      for (const p of allPanes) revealActive(p);
+      focusPane(lastFocused);
+    }
   }
 
   tab.addEventListener("click", () => setOpen(!isOpen));
@@ -285,8 +317,10 @@
     tab.focus();
   });
 
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && isOpen && drawer.contains(document.activeElement)) {
+  // Scoped to the drawer rather than the document: the page's own keystrokes
+  // never reach this handler at all.
+  root.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && isOpen && drawer.contains(e.target)) {
       setOpen(false);
       tab.focus();
     }
@@ -323,19 +357,18 @@
 
   function syncPush() {
     const on = pushEnabled && isOpen && !root.hidden;
-    const html = document.documentElement;
 
     // Containment pulls the page's own position:fixed chrome in with the
     // push, but it would collapse a body that does not stand on its own
     // height. Measure before the push so the reading is unaffected.
-    if (on && !html.classList.contains("ddbn-contain")) {
+    if (on && !htmlEl.classList.contains("ddbn-contain")) {
       const h = document.body ? document.body.getBoundingClientRect().height : 0;
-      html.classList.toggle("ddbn-contain", h >= window.innerHeight * 0.9);
+      htmlEl.classList.toggle("ddbn-contain", h >= window.innerHeight * 0.9);
     } else if (!on) {
-      html.classList.remove("ddbn-contain");
+      htmlEl.classList.remove("ddbn-contain");
     }
 
-    html.classList.toggle("ddbn-pushed", on);
+    htmlEl.classList.toggle("ddbn-pushed", on);
     pushBtn.setAttribute("aria-pressed", String(pushEnabled));
     pushBtn.classList.toggle("is-active", pushEnabled);
     pushBtn.title = pushEnabled
@@ -345,7 +378,7 @@
   }
 
   // Layouts driven by JS rather than CSS only recompute on a resize event.
-  let resizeTimer = null;
+  let resizeTimer = 0;
   function notifyResize() {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
@@ -361,70 +394,89 @@
 
   // ----------------------------------------------------------- width resize
 
+  // The live width is kept here rather than read back out of the computed
+  // style, so nothing in the resize or drag path forces a style recalc.
+  let width = 0;
+
   function applyWidth(px) {
     const cap = Math.max(
       MIN_WIDTH,
       Math.min(MAX_WIDTH, Math.round(window.innerWidth * 0.7))
     );
     const w = Math.min(cap, Math.max(MIN_WIDTH, Math.round(px)));
-    document.documentElement.style.setProperty("--ddbn-width", `${w}px`);
+    if (w !== width) {
+      width = w;
+      htmlStyle.setProperty("--ddbn-width", `${w}px`);
+    }
     return w;
   }
 
-  const currentWidth = () =>
-    parseInt(
-      getComputedStyle(document.documentElement).getPropertyValue("--ddbn-width"),
-      10
-    ) || 340;
-
   let dragging = false;
+  let dragX = 0;
+  let dragFrame = 0;
+
+  // Pointer events outrun paint, so the width lands once per frame.
+  function dragStep() {
+    dragFrame = 0;
+    applyWidth(window.innerWidth - dragX);
+  }
+
+  function endWidthDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    if (grip.hasPointerCapture(e.pointerId)) grip.releasePointerCapture(e.pointerId);
+    // Land the last move that was still waiting on a frame.
+    if (dragFrame) {
+      cancelAnimationFrame(dragFrame);
+      dragStep();
+    }
+    document.body.style.userSelect = "";
+    store.set(UI_WIDTH, width);
+    notifyResize();
+  }
 
   grip.addEventListener("pointerdown", (e) => {
     dragging = true;
+    dragX = e.clientX;
     grip.setPointerCapture(e.pointerId);
     document.body.style.userSelect = "none";
-    document.documentElement.classList.add("ddbn-dragging");
   });
 
   grip.addEventListener("pointermove", (e) => {
     if (!dragging) return;
-    applyWidth(window.innerWidth - e.clientX);
+    dragX = e.clientX;
+    if (!dragFrame) dragFrame = requestAnimationFrame(dragStep);
   });
 
-  grip.addEventListener("pointerup", (e) => {
-    if (!dragging) return;
-    dragging = false;
-    grip.releasePointerCapture(e.pointerId);
-    document.body.style.userSelect = "";
-    document.documentElement.classList.remove("ddbn-dragging");
-    store.set(UI_WIDTH, currentWidth());
-    notifyResize();
-  });
+  grip.addEventListener("pointerup", endWidthDrag);
+  grip.addEventListener("pointercancel", endWidthDrag);
 
   grip.addEventListener("keydown", (e) => {
     const step = e.shiftKey ? 40 : 12;
-    let w = currentWidth();
-    if (e.key === "ArrowLeft") w += step;
-    else if (e.key === "ArrowRight") w -= step;
+    if (e.key === "ArrowLeft") applyWidth(width + step);
+    else if (e.key === "ArrowRight") applyWidth(width - step);
     else return;
     e.preventDefault();
-    store.set(UI_WIDTH, applyWidth(w));
+    store.set(UI_WIDTH, width);
     notifyResize();
   });
 
   window.addEventListener("resize", () => {
     // Re-clamp against the new viewport, but never fight an active drag.
-    if (!dragging) applyWidth(currentWidth());
+    if (!dragging) applyWidth(width);
   });
 
   // ------------------------------------------------------------ split view
 
   let splitOn = false;
-  let ratio = 0.5;
+  let ratio = 0;
 
   function applyRatio(r) {
-    ratio = Math.min(0.85, Math.max(0.15, r));
-    root.style.setProperty("--ddbn-split", `${(ratio * 100).toFixed(2)}%`);
+    const next = Math.min(0.85, Math.max(0.15, r));
+    if (next !== ratio) {
+      ratio = next;
+      rootStyle.setProperty("--ddbn-split", `${(next * 100).toFixed(2)}%`);
+    }
     return ratio;
   }
 
@@ -434,11 +486,13 @@
     if (!doc || !splitOn) return;
     if (doc.sections.length < 2) {
       doc.sections.push(newSection(`Section ${doc.sections.length + 1}`));
+      dirty = true;
     }
     if (!sectionById(doc.active.b) || doc.active.b === doc.active.a) {
       const pick =
         doc.sections.find((s) => s.id !== doc.active.a) || doc.sections[0];
       doc.active.b = pick.id;
+      dirty = true;
     }
   }
 
@@ -468,8 +522,39 @@
   splitBtn.addEventListener("click", () => setSplit(!splitOn));
 
   let dividerDrag = false;
+  let dividerTop = 0;
+  let dividerHeight = 0;
+  let dividerY = 0;
+  let ratioFrame = 0;
+
+  function ratioStep() {
+    ratioFrame = 0;
+    applyRatio((dividerY - dividerTop) / dividerHeight);
+  }
+
+  function endRatioDrag(e) {
+    if (!dividerDrag) return;
+    dividerDrag = false;
+    if (divider.hasPointerCapture(e.pointerId)) {
+      divider.releasePointerCapture(e.pointerId);
+    }
+    if (ratioFrame) {
+      cancelAnimationFrame(ratioFrame);
+      ratioStep();
+    }
+    document.body.style.userSelect = "";
+    root.classList.remove("is-hdragging");
+    store.set(UI_RATIO, ratio);
+  }
 
   divider.addEventListener("pointerdown", (e) => {
+    // The pane column cannot change size mid-drag, so one measurement is
+    // enough; reading it per move was a forced layout on every event.
+    const box = panes.getBoundingClientRect();
+    if (box.height <= 0) return;
+    dividerTop = box.top;
+    dividerHeight = box.height;
+    dividerY = e.clientY;
     dividerDrag = true;
     divider.setPointerCapture(e.pointerId);
     document.body.style.userSelect = "none";
@@ -478,18 +563,12 @@
 
   divider.addEventListener("pointermove", (e) => {
     if (!dividerDrag) return;
-    const box = panes.getBoundingClientRect();
-    if (box.height > 0) applyRatio((e.clientY - box.top) / box.height);
+    dividerY = e.clientY;
+    if (!ratioFrame) ratioFrame = requestAnimationFrame(ratioStep);
   });
 
-  divider.addEventListener("pointerup", (e) => {
-    if (!dividerDrag) return;
-    dividerDrag = false;
-    divider.releasePointerCapture(e.pointerId);
-    document.body.style.userSelect = "";
-    root.classList.remove("is-hdragging");
-    store.set(UI_RATIO, ratio);
-  });
+  divider.addEventListener("pointerup", endRatioDrag);
+  divider.addEventListener("pointercancel", endRatioDrag);
 
   divider.addEventListener("keydown", (e) => {
     const step = e.shiftKey ? 0.1 : 0.03;
@@ -502,12 +581,22 @@
 
   // -------------------------------------------------------------- sections
 
+  function revealActive(pane) {
+    if (pane.activeBtn) {
+      pane.activeBtn.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }
+
   function renderSections(pane) {
-    pane.list.textContent = "";
-    if (!doc) return;
+    pane.activeBtn = null;
+    if (!doc) {
+      pane.list.replaceChildren();
+      return;
+    }
 
     const mine = doc.active[pane.key];
     const taken = splitOn ? doc.active[other(pane).key] : null;
+    const frag = document.createDocumentFragment();
 
     for (const s of doc.sections) {
       const btn = document.createElement("button");
@@ -517,8 +606,12 @@
       btn.setAttribute("role", "tab");
       const active = s.id === mine;
       btn.setAttribute("aria-selected", String(active));
-      btn.classList.toggle("is-active", active);
-      btn.classList.toggle("is-elsewhere", !active && s.id === taken);
+      if (active) {
+        btn.classList.add("is-active");
+        pane.activeBtn = btn;
+      } else if (s.id === taken) {
+        btn.classList.add("is-elsewhere");
+      }
       btn.title = active
         ? `${s.name} — double-click to rename`
         : s.id === taken
@@ -541,26 +634,30 @@
         btn.appendChild(del);
       }
 
-      pane.list.appendChild(btn);
+      frag.appendChild(btn);
     }
 
-    const el = pane.list.querySelector(".ddbn-sec.is-active");
-    if (el) el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    pane.list.replaceChildren(frag);
+    // Scrolling a closed drawer into view is a forced layout for nothing;
+    // setOpen replays it.
+    if (isOpen) revealActive(pane);
   }
 
   function flushPane(pane) {
+    if (!splitOn && pane === paneB) return;
     const s = activeSection(pane);
     if (!s) return;
-    if (!splitOn && pane === paneB) return;
     const html = sanitize(pane.editor.innerHTML);
     if (html !== s.html) {
       s.html = html;
       s.updated = Date.now();
+      dirty = true;
     }
   }
 
   function flushAll() {
-    for (const p of allPanes) flushPane(p);
+    flushPane(paneA);
+    flushPane(paneB);
   }
 
   function updatePlaceholder(pane) {
@@ -570,9 +667,11 @@
       : "Session notes, loot, NPC names, plans.";
   }
 
+  // Section markup is sanitized on load and on every flush, so what the
+  // model holds is already clean by the time it comes back here.
   function showActive(pane) {
     const s = activeSection(pane);
-    pane.editor.innerHTML = s ? sanitize(s.html) : "";
+    pane.editor.innerHTML = s ? s.html : "";
     updatePlaceholder(pane);
   }
 
@@ -593,6 +692,7 @@
       if (splitOn) renderSections(twin);
     }
 
+    dirty = true;
     showActive(pane);
     renderSections(pane);
     save();
@@ -605,11 +705,12 @@
     const s = newSection(`Section ${doc.sections.length + 1}`);
     doc.sections.push(s);
     doc.active[pane.key] = s.id;
+    dirty = true;
     showActive(pane);
-    for (const p of allPanes) renderSections(p);
+    renderSections(paneA);
+    renderSections(paneB);
     save();
-    const el = pane.list.querySelector(".ddbn-sec.is-active .ddbn-sec-name");
-    if (el) beginRename(el);
+    if (pane.activeBtn) beginRename(pane.activeBtn.firstElementChild);
   }
 
   function deleteSection(pane, id) {
@@ -625,10 +726,12 @@
     for (const p of allPanes) {
       if (doc.active[p.key] === id) doc.active[p.key] = fallback;
     }
+    dirty = true;
 
     // Repoint the editors before anything else can flush them: they are
     // still holding the text of the section that just went away.
-    for (const p of allPanes) showActive(p);
+    showActive(paneA);
+    showActive(paneB);
 
     // One section left cannot fill two panes, so the split folds away.
     if (splitOn && doc.sections.length < 2) setSplit(false);
@@ -645,7 +748,7 @@
   let renaming = null;
 
   function beginRename(nameEl) {
-    if (renaming) return;
+    if (renaming || !nameEl) return;
     const btn = nameEl.closest(".ddbn-sec");
     if (!btn) return;
     renaming = btn.dataset.id;
@@ -674,6 +777,7 @@
       if (keep && next && next !== s.name) {
         s.name = next;
         s.updated = Date.now();
+        dirty = true;
         save();
       }
       for (const p of allPanes) {
@@ -738,6 +842,17 @@
       clearTimeout(saveTimer);
       save();
     });
+
+    // Paste as sanitized markup rather than whatever the source page carried.
+    pane.editor.addEventListener("paste", (e) => {
+      e.preventDefault();
+      const html = e.clipboardData.getData("text/html");
+      if (html) {
+        document.execCommand("insertHTML", false, sanitize(html));
+      } else {
+        document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
+      }
+    });
   }
 
   // ------------------------------------------------------- focused editor
@@ -747,7 +862,8 @@
 
   function markFocus(pane) {
     lastFocused = pane;
-    for (const p of allPanes) p.el.classList.toggle("is-focus", p === pane);
+    paneA.el.classList.toggle("is-focus", pane === paneA);
+    paneB.el.classList.toggle("is-focus", pane === paneB);
   }
 
   function focusPane(pane, move = true) {
@@ -757,6 +873,13 @@
   }
 
   // ------------------------------------------------------------- formatting
+
+  // Resolved once: selectionchange fires often enough that re-querying the
+  // toolbar and re-reading dataset on every event is real work.
+  const cmdButtons = Array.from(
+    toolbar.querySelectorAll("button[data-cmd]"),
+    (el) => ({ el, cmd: el.dataset.cmd, on: false })
+  );
 
   toolbar.addEventListener("mousedown", (e) => {
     // Keep the caret in the editor when a toolbar button is pressed.
@@ -772,46 +895,47 @@
     scheduleSave();
   });
 
+  let toolbarFrame = 0;
+
   function refreshToolbar() {
-    for (const btn of toolbar.querySelectorAll("button[data-cmd]")) {
+    if (toolbarFrame) {
+      cancelAnimationFrame(toolbarFrame);
+      toolbarFrame = 0;
+    }
+    for (const b of cmdButtons) {
       let active = false;
       try {
-        active = document.queryCommandState(btn.dataset.cmd);
+        active = document.queryCommandState(b.cmd);
       } catch {
         active = false;
       }
-      btn.classList.toggle("is-active", active);
-      btn.setAttribute("aria-pressed", String(active));
+      if (active === b.on) continue;
+      b.on = active;
+      b.el.classList.toggle("is-active", active);
+      b.el.setAttribute("aria-pressed", String(active));
     }
   }
 
+  // Caret moves come in bursts; one refresh per frame is plenty.
   document.addEventListener("selectionchange", () => {
-    if (allPanes.some((p) => p.editor === document.activeElement)) {
-      refreshToolbar();
-    }
+    if (toolbarFrame) return;
+    const el = document.activeElement;
+    if (el !== paneA.editor && el !== paneB.editor) return;
+    toolbarFrame = requestAnimationFrame(refreshToolbar);
   });
-
-  // Paste as sanitized markup rather than whatever the source page carried.
-  for (const pane of allPanes) {
-    pane.editor.addEventListener("paste", (e) => {
-      e.preventDefault();
-      const html = e.clipboardData.getData("text/html");
-      const text = e.clipboardData.getData("text/plain");
-      if (html) {
-        document.execCommand("insertHTML", false, sanitize(html));
-      } else {
-        document.execCommand("insertText", false, text);
-      }
-    });
-  }
 
   // ------------------------------------------------------------------ save
 
-  let saveTimer = null;
+  let saveTimer = 0;
+  let statusText = "";
+  let statusTone = "";
 
   function setStatus(text, tone = "") {
+    if (text === statusText && tone === statusTone) return;
+    statusText = text;
+    statusTone = tone;
     status.textContent = text;
-    status.className = `ddbn-status ${tone}`;
+    status.className = tone ? `ddbn-status ${tone}` : "ddbn-status";
   }
 
   function scheduleSave() {
@@ -824,55 +948,70 @@
   async function save() {
     if (!currentId || !doc) return;
     flushAll();
+    if (!dirty) return;
+
+    // Cleared up front so a save racing in behind this one does not write
+    // the same document twice; restored if the write actually failed.
+    dirty = false;
     doc.updated = Date.now();
-    const payload = {
-      v: SCHEMA,
-      active: { a: doc.active.a, b: doc.active.b },
-      updated: doc.updated,
-      sections: doc.sections.map((s) => ({
-        id: s.id,
-        name: s.name,
-        html: sanitize(s.html),
-        updated: s.updated,
-      })),
-    };
-    const ok = await store.set(notesKey(currentId), payload);
+    const stamp = doc.updated;
+    // doc already has the stored shape, and chrome.storage clones it on the
+    // way out, so there is nothing to copy here.
+    const ok = await store.set(notesKey(currentId), doc);
     if (ok) {
-      setStatus(`Saved ${new Date(payload.updated).toLocaleTimeString()}`, "is-ok");
+      setStatus(`Saved ${new Date(stamp).toLocaleTimeString()}`, "is-ok");
     } else {
+      dirty = true;
       setStatus("Could not save. Check that the extension is still enabled.", "is-bad");
     }
   }
 
-  window.addEventListener("beforeunload", () => {
+  function flushNow() {
     clearTimeout(saveTimer);
     save();
+  }
+
+  // pagehide rather than beforeunload: beforeunload disqualifies the whole
+  // page from the back/forward cache, and visibilitychange is the handler
+  // that actually runs when a tab is closed on mobile or backgrounded.
+  window.addEventListener("pagehide", flushNow);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushNow();
   });
 
   // ------------------------------------------------------------------ load
 
   // The sheet is a React app, so the name is usually not in the DOM or the
   // title yet at document_idle. Whichever source has filled in first wins,
-  // and the poll below re-reads this until one of them does.
-  function characterLabel(id) {
-    const el = document.querySelector(
-      ".ddbc-character-name, .ddbc-character-summary__name"
-    );
-    const name = (el?.textContent || "").trim();
-    if (name) return name;
+  // and the poll below re-reads this until the sheet's own element appears.
+  const NAME_SEL = ".ddbc-character-name, .ddbc-character-summary__name";
+  const TITLE_TAIL = /\s*[|–—-]\s*(d\s*&\s*d|dnd|dungeons)\b.*$/i;
+  const TITLE_HEAD = /^(d\s*&\s*d|dnd|dungeons)\b/i;
 
-    const t = (document.title || "")
-      .replace(/\s*[|–—-]\s*(d\s*&\s*d|dnd|dungeons)\b.*$/i, "")
-      .trim();
-    if (t && !/^(d\s*&\s*d|dnd|dungeons)\b/i.test(t)) return t;
+  let labelSettled = false;
+
+  function characterLabel(id) {
+    const el = document.querySelector(NAME_SEL);
+    const name = el ? el.textContent.trim() : "";
+    if (name) {
+      labelSettled = true;
+      return name;
+    }
+
+    const t = (document.title || "").replace(TITLE_TAIL, "").trim();
+    if (t && !TITLE_HEAD.test(t)) return t;
 
     return `Character ${id}`;
   }
 
   async function loadFor(id) {
     currentId = id;
+    labelSettled = false;
     title.textContent = characterLabel(id);
-    doc = migrate(await store.get(notesKey(id), null));
+
+    const key = notesKey(id);
+    doc = migrate((await store.get([key]))[key]);
+    dirty = false;
     ensureSplitTargets();
     for (const p of allPanes) {
       showActive(p);
@@ -887,31 +1026,34 @@
     );
   }
 
-  // D&D Beyond routes between characters client-side, so watch the URL. The
-  // same tick picks up the character name once the app has rendered it.
+  // D&D Beyond routes between characters client-side, and a content script
+  // cannot see the page's own history calls, so the URL has to be watched.
+  // The path compare is the whole cost of a tick once the name has landed.
   let lastPath = location.pathname;
+
   setInterval(() => {
-    if (location.pathname === lastPath) {
-      if (currentId) {
-        const label = characterLabel(currentId);
-        if (label !== title.textContent) title.textContent = label;
+    if (location.pathname !== lastPath) {
+      lastPath = location.pathname;
+      labelSettled = false;
+      flushNow();
+      const id = characterId();
+      if (id) {
+        root.hidden = false;
+        loadFor(id);
+      } else {
+        root.hidden = true;
+        currentId = null;
+        doc = null;
       }
+      syncPush();
       return;
     }
-    lastPath = location.pathname;
-    clearTimeout(saveTimer);
-    save();
-    const id = characterId();
-    if (id) {
-      root.hidden = false;
-      loadFor(id);
-    } else {
-      root.hidden = true;
-      currentId = null;
-      doc = null;
+
+    if (currentId && !labelSettled) {
+      const label = characterLabel(currentId);
+      if (label !== title.textContent) title.textContent = label;
     }
-    syncPush();
-  }, 800);
+  }, POLL);
 
   // ------------------------------------------------------------------ boot
 
@@ -921,18 +1063,25 @@
     const id = characterId();
     root.hidden = !id;
 
-    applyWidth(await store.get(UI_WIDTH, 340));
-    applyRatio(Number(await store.get(UI_RATIO, 0.5)) || 0.5);
-    theme = THEMES.includes(await store.get(UI_THEME, "auto"))
-      ? await store.get(UI_THEME, "auto")
-      : "auto";
+    const cfg = await store.get({
+      [UI_WIDTH]: DEF_WIDTH,
+      [UI_RATIO]: DEF_RATIO,
+      [UI_THEME]: "auto",
+      [UI_PUSH]: true,
+      [UI_SPLIT]: false,
+      [UI_OPEN]: false,
+    });
+
+    applyWidth(Number(cfg[UI_WIDTH]) || DEF_WIDTH);
+    applyRatio(Number(cfg[UI_RATIO]) || DEF_RATIO);
+    theme = THEMES.includes(cfg[UI_THEME]) ? cfg[UI_THEME] : "auto";
     syncTheme();
-    pushEnabled = await store.get(UI_PUSH, true);
-    splitOn = await store.get(UI_SPLIT, false);
+    pushEnabled = cfg[UI_PUSH] !== false;
+    splitOn = cfg[UI_SPLIT] === true;
 
     if (id) await loadFor(id);
     setSplit(splitOn, false);
     markFocus(paneA);
-    setOpen(await store.get(UI_OPEN, false), false);
+    setOpen(cfg[UI_OPEN] === true, false);
   })();
 })();

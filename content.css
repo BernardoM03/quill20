@@ -1,43 +1,26 @@
-/* D&D Beyond Sheet Notes
-   A plain side panel in two themes — cool neutral light, warm sepia dark —
-   that can split into two stacked note areas and push the page aside. */
 
 :root {
   --ddbn-width: 340px;
 }
 
-/* ------------------------------------------------------------- push mode */
+/*  push mode */
 
-/* Narrowing the root element is what makes the page's own flex layout
-   reflow into the remaining space rather than sitting under the drawer. */
 html.ddbn-pushed {
   width: calc(100% - var(--ddbn-width)) !important;
   min-width: 0 !important;
   overflow-x: hidden !important;
-  transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 html.ddbn-pushed > body {
   max-width: 100% !important;
 }
-
-/* Only added when the page's body actually fills the viewport. It makes
-   body a containing block, so the app's own position:fixed chrome moves
-   with the push instead of staying pinned to the full viewport. */
 html.ddbn-contain > body {
   contain: layout paint;
 }
 
-/* No easing while a drag is in flight; the pointer is the clock. */
-html.ddbn-dragging,
-html.ddbn-dragging.ddbn-pushed {
-  transition: none !important;
-}
-
-/* ---------------------------------------------------------------- themes */
+/* themes */
 
 #ddb-notes-root {
-  /* Light: cool neutral. */
   --ddbn-ink: #1d2024;
   --ddbn-surface: #ffffff;
   --ddbn-panel: #f2f4f6;
@@ -47,16 +30,11 @@ html.ddbn-dragging.ddbn-pushed {
   --ddbn-accent: #3d7ab8;
   --ddbn-on-accent: #ffffff;
   --ddbn-head-text: #f6f7f8;
-  --ddbn-hover: rgba(15, 20, 25, 0.06);
   --ddbn-danger: #b23c32;
   --ddbn-good: #4a7d54;
-  --ddbn-shadow: rgba(15, 20, 25, 0.14);
 }
 
-/* Dark: warm browns under sepia text, amber for anything that reads as
-   marked or selected. */
-#ddb-notes-root[data-theme="dark"],
-#ddb-notes-root[data-theme="auto"] {
+#ddb-notes-root[data-theme="dark"]] {
   color-scheme: dark;
 }
 
@@ -70,10 +48,8 @@ html.ddbn-dragging.ddbn-pushed {
   --ddbn-accent: #c98a4b;
   --ddbn-on-accent: #1a1410;
   --ddbn-head-text: #f0e2c9;
-  --ddbn-hover: rgba(233, 217, 189, 0.08);
   --ddbn-danger: #d9776a;
   --ddbn-good: #a8bb7e;
-  --ddbn-shadow: rgba(0, 0, 0, 0.5);
 }
 
 @media (prefers-color-scheme: light) {
@@ -91,14 +67,12 @@ html.ddbn-dragging.ddbn-pushed {
     --ddbn-accent: #c98a4b;
     --ddbn-on-accent: #1a1410;
     --ddbn-head-text: #f0e2c9;
-    --ddbn-hover: rgba(233, 217, 189, 0.08);
     --ddbn-danger: #d9776a;
     --ddbn-good: #a8bb7e;
-    --ddbn-shadow: rgba(0, 0, 0, 0.5);
   }
 }
 
-/* ------------------------------------------------------------------ root */
+/* root */
 
 #ddb-notes-root {
   --ddbn-split: 50%;
@@ -132,13 +106,13 @@ html.ddbn-dragging.ddbn-pushed {
   outline-offset: 2px;
 }
 
-/* -------------------------------------------------------------- edge tab */
+/* edge tab */
 
 #ddb-notes-root .ddbn-tab {
   position: absolute;
   top: 50%;
   right: 0;
-  transform: translateY(-50%);
+  transform: translate(0, -50%);
   pointer-events: auto;
   display: flex;
   align-items: center;
@@ -150,16 +124,12 @@ html.ddbn-dragging.ddbn-pushed {
   background: var(--ddbn-ink);
   color: var(--ddbn-head-text);
   cursor: pointer;
-  box-shadow: -2px 0 12px var(--ddbn-shadow);
-  transition: background 140ms ease, right 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-#ddb-notes-root .ddbn-tab:hover {
-  background: var(--ddbn-accent);
-  color: var(--ddbn-on-accent);
+#ddb-notes-root.is-open .ddbn-tab {
+  transform: translate(calc(-1 * var(--ddbn-width)), -50%);
 }
-
-#ddb-notes-root.is-open .ddbn-tab { right: var(--ddbn-width); }
 
 #ddb-notes-root .ddbn-tab-label {
   writing-mode: vertical-rl;
@@ -169,7 +139,7 @@ html.ddbn-dragging.ddbn-pushed {
   text-transform: uppercase;
 }
 
-/* ---------------------------------------------------------------- drawer */
+/* drawer */
 
 #ddb-notes-root .ddbn-drawer {
   position: absolute;
@@ -182,7 +152,6 @@ html.ddbn-dragging.ddbn-pushed {
   flex-direction: column;
   background: var(--ddbn-surface);
   border-left: 1px solid var(--ddbn-border);
-  box-shadow: -8px 0 24px var(--ddbn-shadow);
   transform: translateX(100%);
   transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -200,14 +169,8 @@ html.ddbn-dragging.ddbn-pushed {
   z-index: 2;
 }
 
-#ddb-notes-root .ddbn-grip:hover {
-  background: color-mix(in srgb, var(--ddbn-accent) 40%, transparent);
-}
+/* head */
 
-/* ------------------------------------------------------------------ head */
-
-/* Deliberately one line tall: every row of chrome here is a row the notes
-   do not get. */
 #ddb-notes-root .ddbn-head {
   display: flex;
   align-items: center;
@@ -241,12 +204,7 @@ html.ddbn-dragging.ddbn-pushed {
   cursor: pointer;
 }
 
-#ddb-notes-root .ddbn-close:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--ddbn-head-text);
-}
-
-/* --------------------------------------------------------------- toolbar */
+/* toolbar */
 
 #ddb-notes-root .ddbn-toolbar {
   display: flex;
@@ -268,8 +226,6 @@ html.ddbn-dragging.ddbn-pushed {
   font-size: 12px;
   cursor: pointer;
 }
-
-#ddb-notes-root .ddbn-toolbar button:hover { background: var(--ddbn-hover); }
 
 #ddb-notes-root .ddbn-toolbar button.is-active {
   background: var(--ddbn-accent);
@@ -299,7 +255,7 @@ html.ddbn-dragging.ddbn-pushed {
   color: var(--ddbn-on-accent) !important;
 }
 
-/* ----------------------------------------------------------------- panes */
+/* panes */
 
 #ddb-notes-root .ddbn-panes {
   flex: 1;
@@ -326,11 +282,6 @@ html.ddbn-dragging.ddbn-pushed {
   flex: 1 1 auto;
 }
 
-/* Which pane the toolbar will act on. */
-#ddb-notes-root.is-split .ddbn-pane.is-focus .ddbn-sectionbar {
-  box-shadow: inset 3px 0 0 var(--ddbn-accent);
-}
-
 #ddb-notes-root .ddbn-hsplit {
   display: none;
   flex: none;
@@ -342,19 +293,21 @@ html.ddbn-dragging.ddbn-pushed {
 
 #ddb-notes-root.is-split .ddbn-hsplit { display: block; }
 
-#ddb-notes-root .ddbn-hsplit:hover,
-#ddb-notes-root.is-hdragging .ddbn-hsplit {
-  background: color-mix(in srgb, var(--ddbn-accent) 40%, transparent);
-}
+#ddb-notes-root.is-hdragging .ddbn-hsplit { background: var(--ddbn-accent); }
 
-/* -------------------------------------------------------------- sections */
+/*  sections */
 
 #ddb-notes-root .ddbn-sectionbar {
   display: flex;
   align-items: stretch;
   flex: none;
   background: var(--ddbn-panel);
+  border-left: 3px solid transparent;
   border-bottom: 1px solid var(--ddbn-border);
+}
+
+#ddb-notes-root.is-split .ddbn-pane.is-focus .ddbn-sectionbar {
+  border-left-color: var(--ddbn-accent);
 }
 
 #ddb-notes-root .ddbn-sections {
@@ -363,7 +316,7 @@ html.ddbn-dragging.ddbn-pushed {
   display: flex;
   align-items: stretch;
   gap: 2px;
-  padding: 4px 4px 0 6px;
+  padding: 4px 4px 0 3px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
@@ -394,24 +347,14 @@ html.ddbn-dragging.ddbn-pushed {
   white-space: nowrap;
 }
 
-#ddb-notes-root .ddbn-sec:hover {
-  background: var(--ddbn-hover);
-  color: var(--ddbn-text);
-}
-
 #ddb-notes-root .ddbn-sec.is-active {
   background: var(--ddbn-surface);
   border-color: var(--ddbn-border);
   color: var(--ddbn-text);
   font-weight: 600;
-  box-shadow: 0 1px 0 0 var(--ddbn-surface);
 }
 
-/* Open in the other pane: still reachable, but marked as spoken for. */
-#ddb-notes-root .ddbn-sec.is-elsewhere {
-  color: var(--ddbn-accent);
-  opacity: 0.75;
-}
+#ddb-notes-root .ddbn-sec.is-elsewhere { color: var(--ddbn-accent); }
 
 #ddb-notes-root .ddbn-sec-name {
   overflow: hidden;
@@ -438,11 +381,7 @@ html.ddbn-dragging.ddbn-pushed {
   color: var(--ddbn-muted);
   font-size: 14px;
   line-height: 1;
-}
-
-#ddb-notes-root .ddbn-sec-del:hover {
-  background: color-mix(in srgb, var(--ddbn-danger) 18%, transparent);
-  color: var(--ddbn-danger);
+  cursor: pointer;
 }
 
 #ddb-notes-root .ddbn-add {
@@ -457,12 +396,7 @@ html.ddbn-dragging.ddbn-pushed {
   cursor: pointer;
 }
 
-#ddb-notes-root .ddbn-add:hover {
-  background: var(--ddbn-hover);
-  color: var(--ddbn-text);
-}
-
-/* --------------------------------------------------------------- editors */
+/* editors */
 
 #ddb-notes-root .ddbn-editor {
   flex: 1;
@@ -492,7 +426,7 @@ html.ddbn-dragging.ddbn-pushed {
 
 #ddb-notes-root .ddbn-editor p { margin: 0; }
 
-/* ------------------------------------------------------------------ foot */
+/* foot */
 
 #ddb-notes-root .ddbn-foot {
   display: flex;
@@ -531,12 +465,6 @@ html.ddbn-dragging.ddbn-pushed {
   font-weight: 600;
   letter-spacing: 0.03em;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
-}
-
-#ddb-notes-root .ddbn-foot button:hover {
-  background: var(--ddbn-hover);
-  color: var(--ddbn-text);
 }
 
 #ddb-notes-root .ddbn-foot button.is-active {
@@ -545,17 +473,14 @@ html.ddbn-dragging.ddbn-pushed {
   color: var(--ddbn-on-accent);
 }
 
-/* --------------------------------------------------------------- narrow */
+/* narrow */
 
 @media (max-width: 620px) {
-  :root { --ddbn-width: 88vw; }
   #ddb-notes-root .ddbn-grip { display: none; }
-  /* Too little room left to push anything into. */
   html.ddbn-pushed { width: 100% !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html.ddbn-pushed,
   #ddb-notes-root .ddbn-drawer,
   #ddb-notes-root .ddbn-tab { transition: none; }
 }
