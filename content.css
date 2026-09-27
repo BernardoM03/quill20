@@ -34,7 +34,7 @@ html.ddbn-contain > body {
   --ddbn-good: #4a7d54;
 }
 
-#ddb-notes-root[data-theme="dark"]] {
+#ddb-notes-root[data-theme="dark"] {
   color-scheme: dark;
 }
 
@@ -78,6 +78,8 @@ html.ddbn-contain > body {
   --ddbn-split: 50%;
   --ddbn-font: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
     "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ddbn-mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo,
+    monospace;
   --ddbn-z: 2147483000;
 
   position: fixed;
@@ -208,6 +210,7 @@ html.ddbn-contain > body {
 
 #ddb-notes-root .ddbn-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   padding: 5px 7px;
@@ -247,6 +250,11 @@ html.ddbn-contain > body {
   font-size: 11px !important;
   font-weight: 600;
   letter-spacing: 0.03em;
+}
+
+#ddb-notes-root .ddbn-split-toggle:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 #ddb-notes-root .ddbn-split-toggle.is-active {
@@ -298,6 +306,7 @@ html.ddbn-contain > body {
 /*  sections */
 
 #ddb-notes-root .ddbn-sectionbar {
+  position: relative;
   display: flex;
   align-items: stretch;
   flex: none;
@@ -354,7 +363,15 @@ html.ddbn-contain > body {
   font-weight: 600;
 }
 
-#ddb-notes-root .ddbn-sec.is-elsewhere { color: var(--ddbn-accent); }
+/* tab drag: an accent bar marks the slot the tab would land in */
+
+#ddb-notes-root .ddbn-sec.is-dragging { opacity: 0.45; }
+#ddb-notes-root .ddbn-sec.is-drop-before { box-shadow: inset 2px 0 0 var(--ddbn-accent); }
+#ddb-notes-root .ddbn-sec.is-drop-after { box-shadow: inset -2px 0 0 var(--ddbn-accent); }
+
+#ddb-notes-root .ddbn-pane.is-drop-target .ddbn-sectionbar {
+  background: color-mix(in srgb, var(--ddbn-accent) 16%, var(--ddbn-panel));
+}
 
 #ddb-notes-root .ddbn-sec-name {
   overflow: hidden;
@@ -370,7 +387,7 @@ html.ddbn-contain > body {
   overflow: visible;
 }
 
-#ddb-notes-root .ddbn-sec-del {
+#ddb-notes-root .ddbn-sec-close {
   flex: none;
   width: 15px;
   height: 15px;
@@ -384,9 +401,11 @@ html.ddbn-contain > body {
   cursor: pointer;
 }
 
-#ddb-notes-root .ddbn-add {
+#ddb-notes-root .ddbn-add,
+#ddb-notes-root .ddbn-shelf-btn {
   flex: none;
-  width: 28px;
+  min-width: 28px;
+  padding: 0 6px;
   border: 0;
   border-left: 1px solid var(--ddbn-border);
   background: transparent;
@@ -394,6 +413,96 @@ html.ddbn-contain > body {
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
+}
+
+#ddb-notes-root .ddbn-shelf-btn {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+#ddb-notes-root .ddbn-shelf-btn[aria-expanded="true"] {
+  background: var(--ddbn-surface);
+  color: var(--ddbn-text);
+}
+
+/* closed notes menu, dropped from the tab strip over the editor */
+
+#ddb-notes-root .ddbn-shelf {
+  position: absolute;
+  top: 100%;
+  left: 6px;
+  right: 6px;
+  z-index: 5;
+  max-height: min(340px, 55vh);
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--ddbn-surface);
+  border: 1px solid var(--ddbn-border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+#ddb-notes-root .ddbn-shelf[hidden] { display: none; }
+
+#ddb-notes-root .ddbn-shelf-head {
+  padding: 6px 8px 3px;
+  color: var(--ddbn-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#ddb-notes-root .ddbn-shelf-row {
+  display: flex;
+  align-items: stretch;
+  border-radius: 4px;
+}
+
+#ddb-notes-root .ddbn-shelf-row:hover { background: var(--ddbn-panel); }
+
+#ddb-notes-root .ddbn-shelf-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--ddbn-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+#ddb-notes-root .ddbn-shelf-name,
+#ddb-notes-root .ddbn-shelf-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#ddb-notes-root .ddbn-shelf-name { font-size: 13px; font-weight: 600; }
+#ddb-notes-root .ddbn-shelf-meta { font-size: 11px; color: var(--ddbn-muted); }
+
+#ddb-notes-root .ddbn-shelf-del {
+  flex: none;
+  width: 28px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ddbn-muted);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+#ddb-notes-root .ddbn-shelf-del:hover { color: var(--ddbn-danger); }
+
+#ddb-notes-root .ddbn-shelf-empty {
+  padding: 10px 8px;
+  color: var(--ddbn-muted);
+  font-size: 12px;
 }
 
 /* editors */
@@ -418,13 +527,192 @@ html.ddbn-contain > body {
   color: var(--ddbn-muted);
 }
 
-#ddb-notes-root .ddbn-editor ul,
-#ddb-notes-root .ddbn-editor ol {
-  padding-left: 22px;
-  margin: 0;
+/* markdown: every syntax character stays in the text; .md-mark hides the
+   ones on lines the caret is not on (those without .is-active) */
+
+/* The editor's size comes from the drawer, never from its text. Saying so
+   stops every repaint of one line from re-laying out every other line. */
+#ddb-notes-root .ddbn-editor {
+  contain: strict;
+  white-space: pre-wrap;
+  tab-size: 4;
 }
 
-#ddb-notes-root .ddbn-editor p { margin: 0; }
+#ddb-notes-root .md-mark {
+  color: var(--ddbn-muted);
+  font-weight: 400;
+  font-style: normal;
+}
+
+#ddb-notes-root .md-line:not(.is-active) .md-mark:not(.md-keep) { display: none; }
+
+#ddb-notes-root .md-h {
+  font-weight: 700;
+  line-height: 1.3;
+  padding: 0.45em 0 0.15em;
+}
+
+#ddb-notes-root .md-h1 { font-size: 1.6em; }
+#ddb-notes-root .md-h2 { font-size: 1.35em; }
+#ddb-notes-root .md-h3 { font-size: 1.17em; }
+#ddb-notes-root .md-h4 { font-size: 1.05em; }
+#ddb-notes-root .md-h5 { font-size: 1em; }
+#ddb-notes-root .md-h6 { font-size: 0.92em; color: var(--ddbn-muted); }
+
+#ddb-notes-root .ddbn-editor strong { font-weight: 700; }
+#ddb-notes-root .ddbn-editor em { font-style: italic; }
+#ddb-notes-root .ddbn-editor s { text-decoration: line-through; }
+#ddb-notes-root .ddbn-editor u { text-decoration: underline; }
+
+#ddb-notes-root .ddbn-editor mark {
+  background: color-mix(in srgb, #e8b93c 42%, transparent);
+  color: inherit;
+  border-radius: 2px;
+}
+
+#ddb-notes-root .ddbn-editor code {
+  font-family: var(--ddbn-mono);
+  font-size: 0.88em;
+  padding: 0.05em 0.3em;
+  border: 1px solid var(--ddbn-border);
+  border-radius: 3px;
+  background: var(--ddbn-panel);
+}
+
+#ddb-notes-root .md-code,
+#ddb-notes-root .md-fence {
+  font-family: var(--ddbn-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  padding: 0 10px;
+  background: var(--ddbn-panel);
+}
+
+#ddb-notes-root .md-fence { color: var(--ddbn-muted); }
+#ddb-notes-root .md-fence-start { border-radius: 5px 5px 0 0; padding-top: 3px; }
+#ddb-notes-root .md-fence-end { border-radius: 0 0 5px 5px; padding-bottom: 3px; }
+
+#ddb-notes-root .md-quote {
+  padding-left: 10px;
+  border-left: 3px solid var(--ddbn-accent);
+}
+
+#ddb-notes-root .md-bullet,
+#ddb-notes-root .md-ol,
+#ddb-notes-root .md-check { color: var(--ddbn-muted); }
+
+/* rendered bullets and checkboxes draw over their transparent source text,
+   which keeps its width, so the caret still has somewhere to land */
+
+#ddb-notes-root .md-line:not(.is-active) .md-bullet {
+  position: relative;
+  color: transparent;
+}
+
+#ddb-notes-root .md-line:not(.is-active) .md-bullet::after {
+  content: "\2022";
+  position: absolute;
+  inset: 0;
+  text-align: center;
+  color: var(--ddbn-accent);
+}
+
+#ddb-notes-root .md-line:not(.is-active) .md-check {
+  position: relative;
+  color: transparent;
+  cursor: pointer;
+}
+
+#ddb-notes-root .md-line:not(.is-active) .md-check::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  margin: -7px 0 0 -7px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--ddbn-muted);
+  border-radius: 3px;
+}
+
+#ddb-notes-root .md-done:not(.is-active) .md-check::before {
+  background: var(--ddbn-accent);
+  border-color: var(--ddbn-accent);
+}
+
+#ddb-notes-root .md-done:not(.is-active) .md-check::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 7px;
+  margin: -6px 0 0 -3px;
+  border: solid var(--ddbn-on-accent);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+#ddb-notes-root .md-done:not(.is-active) .md-task-text {
+  color: var(--ddbn-muted);
+  text-decoration: line-through;
+}
+
+#ddb-notes-root .md-hr { color: var(--ddbn-muted); }
+
+#ddb-notes-root .md-hr:not(.is-active) {
+  color: transparent;
+  background: linear-gradient(var(--ddbn-border), var(--ddbn-border))
+    center / 100% 1px no-repeat;
+}
+
+#ddb-notes-root .md-link,
+#ddb-notes-root .md-wikilink {
+  color: var(--ddbn-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+#ddb-notes-root .md-wikilink { text-decoration-style: dotted; }
+
+#ddb-notes-root .md-line:not(.is-active) .md-link,
+#ddb-notes-root .md-line:not(.is-active) .md-wikilink { cursor: pointer; }
+
+#ddb-notes-root .md-tag {
+  padding: 0 6px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--ddbn-accent) 14%, transparent);
+  color: var(--ddbn-accent);
+}
+
+/* tables: consecutive table-row lines share one anonymous table box, so
+   their columns line up; the caret anywhere in a table opens all of it */
+
+#ddb-notes-root .md-t:not(.is-active) { display: table-row; }
+#ddb-notes-root .md-tsep:not(.is-active) { display: none; }
+
+#ddb-notes-root .md-t:not(.is-active) .md-td {
+  display: table-cell;
+  padding: 3px 8px;
+  border: solid var(--ddbn-border);
+  border-width: 0 1px 1px 0;
+  white-space: normal;
+}
+
+#ddb-notes-root .md-t:not(.is-active) .md-td0 { border-left-width: 1px; }
+
+#ddb-notes-root .md-th:not(.is-active) .md-td {
+  border-top-width: 1px;
+  background: var(--ddbn-panel);
+  font-weight: 600;
+}
+
+#ddb-notes-root .md-t.is-active {
+  font-family: var(--ddbn-mono);
+  font-size: 12.5px;
+}
 
 /* foot */
 
